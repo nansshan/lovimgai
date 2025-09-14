@@ -18,6 +18,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from '@/components/ui/sidebar';
+import { getUserMenuLinks } from '@/config/user-menu-config';
 import { websiteConfig } from '@/config/website';
 import { useLocalePathname, useLocaleRouter } from '@/i18n/navigation';
 import { LOCALES, routing } from '@/i18n/routing';
@@ -56,6 +57,8 @@ export function SidebarUser({ user, className }: SidebarUserProps) {
   const { currentLocale, setCurrentLocale } = useLocaleStore();
   const [, startTransition] = useTransition();
   const t = useTranslations();
+  const { data: session } = authClient.useSession();
+  const currentUser = session?.user;
 
   const setLocale = (nextLocale: Locale) => {
     setCurrentLocale(nextLocale);
@@ -132,6 +135,22 @@ export function SidebarUser({ user, className }: SidebarUserProps) {
                 </div>
               </div>
             </DropdownMenuLabel>
+
+            <DropdownMenuSeparator />
+
+            {/* Admin和Settings功能组 */}
+            <DropdownMenuGroup>
+              {getUserMenuLinks(currentUser?.role || undefined).map((item) => (
+                <DropdownMenuItem
+                  key={item.title}
+                  className="cursor-pointer"
+                  onClick={() => router.push(item.href || '')}
+                >
+                  {item.icon}
+                  <span className="ml-2">{item.title}</span>
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuGroup>
 
             {(showModeSwitch || showLocaleSwitch) && <DropdownMenuSeparator />}
 
