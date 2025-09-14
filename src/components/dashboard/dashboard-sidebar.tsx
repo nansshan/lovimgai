@@ -1,5 +1,6 @@
 'use client';
 
+import { AIEditorSidebarSection } from '@/components/dashboard/ai-editor-sidebar-section';
 import { SidebarMain } from '@/components/dashboard/sidebar-main';
 import { SidebarUser } from '@/components/dashboard/sidebar-user';
 import {
@@ -69,6 +70,9 @@ export function DashboardSidebar({
 
       <SidebarContent>
         {!isPending && mounted && <SidebarMain items={filteredSidebarLinks} />}
+
+        {/* AI编辑器侧边栏内容 - 仅在AI编辑器页面显示 */}
+        {!isPending && mounted && <AIEditorSidebarSection />}
       </SidebarContent>
 
       <SidebarFooter className="flex flex-col gap-4">
