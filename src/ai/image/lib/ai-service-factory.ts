@@ -9,7 +9,7 @@
  */
 export interface CreatePredictionParams {
   prompt: string;
-  inputImages?: string[];
+  inputImages?: (string | File)[];
   modelId: string;
   webhookUrl?: string;
 }
@@ -85,7 +85,15 @@ export class ReplicateService implements AIService {
 
     // 如果有输入图片，添加到请求中
     if (inputImages && inputImages.length > 0) {
-      requestBody.input.image = inputImages[0]; // 大多数模型只支持单张输入图片
+      const image = inputImages[0];
+      if (image instanceof File) {
+        // 使用Replicate Local File方式，直接传递File对象
+        requestBody.input.image = image;
+      } else if (typeof image === 'string') {
+        // 使用现有URL方式，保持向后兼容
+        requestBody.input.image = image;
+      }
+      // 大多数模型只支持单张输入图片
     }
 
     // 如果有webhook URL，添加到请求中

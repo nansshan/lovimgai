@@ -9,6 +9,7 @@ import { zhCN } from 'date-fns/locale';
 import { ImageIcon, SendIcon, StopCircleIcon } from 'lucide-react';
 import { useLocale } from 'next-intl';
 import { useState, type KeyboardEvent } from 'react';
+import { toast } from 'sonner';
 
 export interface ChatMessage {
   id: string;
@@ -72,14 +73,42 @@ export function ChatInterface({
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
-    const validImages = files.filter(file => file.type.startsWith('image/'));
 
+    // 文件验证和过滤
+    const validImages: File[] = [];
+    const maxSizeInMB = 50;
+    const maxSizeInBytes = maxSizeInMB * 1024 * 1024;
+
+    for (const file of files) {
+      // 检查文件类型
+      if (!file.type.startsWith('image/')) {
+        toast.error(`文件 "${file.name}" 不是有效的图片格式`);
+        continue;
+      }
+
+      // 检查文件大小
+      if (file.size > maxSizeInBytes) {
+        toast.error(`文件 "${file.name}" 大小超过 ${maxSizeInMB}MB 限制`);
+        continue;
+      }
+
+      validImages.push(file);
+    }
+
+    // 检查总数量限制
     if (validImages.length + selectedImages.length > maxImages) {
-      // TODO: 显示错误提示
+      toast.error(`最多只能选择 ${maxImages} 张图片`);
       return;
     }
 
-    setSelectedImages(prev => [...prev, ...validImages]);
+    // 添加有效图片
+    if (validImages.length > 0) {
+      setSelectedImages(prev => [...prev, ...validImages]);
+      toast.success(`成功添加 ${validImages.length} 张图片`);
+    }
+
+    // 清空input值，允许重复选择同一文件
+    e.target.value = '';
   };
 
   const removeImage = (index: number) => {
@@ -122,78 +151,110 @@ export function ChatInterface({
           {selectedImages.length > 0 && (
             <div className="flex flex-wrap gap-2">
               {selectedImages.map((file, index) => (
-                <div key={index} className="relative">
-                  <img
-                    src={URL.createObjectURL(file)}
-                    alt={`Selected ${index + 1}`}
-                    className="size-16 object-cover rounded-lg border"
-                  />
-                  <button
-                    onClick={() => removeImage(index)}
-                    className="absolute -top-1 -right-1 size-5 rounded-full bg-destructive text-destructive-foreground text-xs flex items-center justify-center"
-                  >
-                    ✕
-                  </button>
+                <div key={index} className="relative group">
+                  <div className="relative overflow-hidden rounded-lg border bg-muted/50">
+                    <img
+                      src={URL.createObjectURL(file)}
+                      alt={`Selected ${index + 1}`}
+                      className="w-16 h-16 object-cover transition-transform group-hover:scale-105"
+                    />
+                    <button
+                      onClick={() => removeImage(index)}
+                      className="absolute -top-1 -right-1 size-5 rounded-full bg-destructive text-destructive-foreground text-xs flex items-center justify-center shadow-sm hover:bg-destructive/90 transition-colors"
+                      title="删除图片"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  <div className="mt-1 text-xs text-muted-foreground text-center truncate max-w-16">
+                    {(file.size / 1024 / 1024).toFixed(1)}MB
+                  </div>
                 </div>
               ))}
             </div>
           )}
 
-          {/* 输入框和按钮 */}
-          <div className="flex items-end gap-2">
-            <div className="flex-1">
-              <Textarea
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder={placeholder}
-                disabled={disabled}
-                className="min-h-[60px] max-h-[120px] resize-none"
-                rows={2}
-              />
-            </div>
-
-            <div className="flex flex-col gap-2">
+          {/* 输入框容器 */}
+          <div className="relative">
+            <div className="flex items-end gap-2 p-3 border rounded-lg bg-background focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary transition-all">
               {/* 图片上传按钮 */}
-              <div className="relative">
+              <div className="relative group flex-shrink-0">
                 <input
                   type="file"
                   accept="image/*"
                   multiple
                   onChange={handleImageSelect}
-                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
                   disabled={disabled || selectedImages.length >= maxImages}
                 />
                 <Button
-                  variant="outline"
+                  variant="ghost"
                   size="sm"
                   disabled={disabled || selectedImages.length >= maxImages}
-                  className="size-10"
+                  className={cn(
+                    "size-8 p-0 transition-all duration-200",
+                    "hover:bg-muted/50 hover:scale-105",
+                    "disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100",
+                    selectedImages.length >= maxImages && "opacity-40"
+                  )}
+                  title={selectedImages.length >= maxImages ? `最多选择${maxImages}张图片` : "上传图片"}
                 >
-                  <ImageIcon className="size-4" />
+                  <ImageIcon className="size-4 text-muted-foreground" />
                 </Button>
               </div>
 
+              {/* 输入框 */}
+              <div className="flex-1 min-w-0">
+                <Textarea
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder={placeholder}
+                  disabled={disabled}
+                  className={cn(
+                    "min-h-[40px] max-h-[120px] resize-none border-none p-0 shadow-none focus-visible:ring-0",
+                    "placeholder:text-muted-foreground/70 bg-transparent",
+                    disabled && "opacity-50 cursor-not-allowed"
+                  )}
+                  rows={1}
+                />
+              </div>
+
               {/* 发送/停止按钮 */}
-              {isGenerating ? (
-                <Button
-                  onClick={onStopGeneration}
-                  variant="destructive"
-                  size="sm"
-                  className="size-10"
-                >
-                  <StopCircleIcon className="size-4" />
-                </Button>
-              ) : (
-                <Button
-                  onClick={handleSend}
-                  disabled={disabled || (!input.trim() && selectedImages.length === 0)}
-                  size="sm"
-                  className="size-10"
-                >
-                  <SendIcon className="size-4" />
-                </Button>
-              )}
+              <div className="flex-shrink-0">
+                {isGenerating ? (
+                  <Button
+                    onClick={onStopGeneration}
+                    variant="destructive"
+                    size="sm"
+                    className={cn(
+                      "size-8 p-0 transition-all duration-200",
+                      "hover:scale-105 active:scale-95",
+                      "animate-pulse"
+                    )}
+                    title="停止生成"
+                  >
+                    <StopCircleIcon className="size-4" />
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={handleSend}
+                    disabled={disabled || (!input.trim() && selectedImages.length === 0)}
+                    size="sm"
+                    className={cn(
+                      "size-8 p-0 transition-all duration-200",
+                      "hover:scale-105 active:scale-95",
+                      "disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100",
+                      (!input.trim() && selectedImages.length === 0) ?
+                        "bg-muted text-muted-foreground hover:bg-muted" :
+                        "bg-primary text-primary-foreground hover:bg-primary/90"
+                    )}
+                    title={(!input.trim() && selectedImages.length === 0) ? "请输入内容或选择图片" : "发送消息"}
+                  >
+                    <SendIcon className="size-4" />
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
         </div>

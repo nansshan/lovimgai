@@ -37,7 +37,7 @@ export interface AITask {
 export interface ProcessAIRequest {
   sessionId: string;
   prompt: string;
-  inputImages?: string[];
+  inputImages?: (string | File)[];
   modelId: string;
 }
 
