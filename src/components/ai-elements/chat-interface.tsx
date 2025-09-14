@@ -3,12 +3,6 @@
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Textarea } from '@/components/ui/textarea';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger
-} from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
@@ -17,6 +11,8 @@ import { useLocale } from 'next-intl';
 import { useState, useEffect, type KeyboardEvent } from 'react';
 import { toast } from 'sonner';
 import { AVAILABLE_MODELS, DEFAULT_MODEL_ID, type AIModel } from '@/config/ai-models-config';
+import { MotionHighlight, MotionHighlightItem } from '@/components/animate-ui/effects/motion-highlight';
+import { AnimatePresence, motion } from 'motion/react';
 
 export interface ChatMessage {
   id: string;
@@ -66,12 +62,33 @@ export function ChatInterface({
   const [input, setInput] = useState('');
   const [selectedImages, setSelectedImages] = useState<File[]>([]);
   const [currentModelId, setCurrentModelId] = useState(selectedModelId);
+  const [showModelSelector, setShowModelSelector] = useState(false);
   const locale = useLocale();
 
   // 同步外部传入的模型ID
   useEffect(() => {
     setCurrentModelId(selectedModelId);
   }, [selectedModelId]);
+
+  // 点击外部关闭模型选择器
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (showModelSelector) {
+        const target = event.target as Element;
+        if (!target.closest('[data-model-selector]')) {
+          setShowModelSelector(false);
+        }
+      }
+    };
+
+    if (showModelSelector) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showModelSelector]);
 
   const currentModel = AVAILABLE_MODELS.find(model => model.id === currentModelId) || AVAILABLE_MODELS[0];
 
@@ -136,9 +153,23 @@ export function ChatInterface({
   };
 
   const handleModelChange = (modelId: string) => {
+    console.log('Switching to model:', modelId); // 调试信息
+    const selectedModel = AVAILABLE_MODELS.find(m => m.id === modelId);
+
+    if (!selectedModel) {
+      console.error('Model not found:', modelId);
+      toast.error('模型不存在');
+      return;
+    }
+
     setCurrentModelId(modelId);
     onModelChange?.(modelId);
-    toast.success(`已切换到 ${AVAILABLE_MODELS.find(m => m.id === modelId)?.name} 模型`);
+    setShowModelSelector(false);
+    toast.success(`已切换到 ${selectedModel.name} 模型`);
+  };
+
+  const toggleModelSelector = () => {
+    setShowModelSelector(!showModelSelector);
   };
 
   return (
@@ -289,54 +320,91 @@ export function ChatInterface({
                   </div>
 
                   {/* 模型选择器 */}
-                  <div className="flex-shrink-0">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          disabled={disabled}
-                          className={cn(
-                            "h-8 px-2 gap-1 transition-all duration-200",
-                            "hover:bg-muted/50 hover:scale-105",
-                            "disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100",
-                            "text-xs font-medium"
-                          )}
-                          title="选择AI模型"
+                  <div className="relative">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={disabled}
+                      onClick={toggleModelSelector}
+                      className={cn(
+                        "h-8 px-2 gap-1 transition-all duration-200",
+                        "hover:bg-muted/50 hover:scale-105",
+                        "disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100",
+                        "text-xs font-medium",
+                        showModelSelector && "bg-muted/50"
+                      )}
+                      title="选择AI模型"
+                      data-model-selector
+                    >
+                      <BrainCircuitIcon className="size-3 text-muted-foreground" />
+                      <span className="text-muted-foreground">{currentModel.name}</span>
+                      <span className="text-xs text-orange-500 font-semibold">{currentModel.creditsPerUse}</span>
+                      <motion.div
+                        animate={{ rotate: showModelSelector ? 180 : 0 }}
+                        transition={{ duration: 0.2 }}
+                      >
+                        <ChevronDownIcon className="size-3 text-muted-foreground" />
+                      </motion.div>
+                    </Button>
+
+                    {/* 模型选择面板 */}
+                    <AnimatePresence>
+                      {showModelSelector && (
+                        <motion.div
+                          initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                          transition={{ duration: 0.2, ease: 'easeOut' }}
+                          className="absolute bottom-full left-0 mb-2 min-w-56 bg-popover border rounded-lg shadow-lg overflow-hidden z-50"
+                          data-model-selector
                         >
-                          <BrainCircuitIcon className="size-3 text-muted-foreground" />
-                          <span className="text-muted-foreground">{currentModel.name}</span>
-                          <span className="text-xs text-orange-500 font-semibold">{currentModel.creditsPerUse}</span>
-                          <ChevronDownIcon className="size-3 text-muted-foreground" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="start" className="w-56">
-                        {AVAILABLE_MODELS.map((model) => (
-                          <DropdownMenuItem
-                            key={model.id}
-                            onClick={() => handleModelChange(model.id)}
-                            className={cn(
-                              "flex items-center justify-between cursor-pointer",
-                              currentModelId === model.id && "bg-accent"
-                            )}
+                          <MotionHighlight
+                            key={currentModelId} // 确保状态同步
+                            mode="parent"
+                            value={currentModelId}
+                            transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+                            className="bg-primary/10 rounded-md"
                           >
-                            <div className="flex flex-col">
-                              <span className="font-medium">{model.name}</span>
-                              <span className="text-xs text-muted-foreground">{model.provider}</span>
+                            <div className="p-1">
+                              {AVAILABLE_MODELS.map((model) => (
+                                <MotionHighlightItem
+                                  key={model.id}
+                                  value={model.id}
+                                  className="relative"
+                                >
+                                  <button
+                                    className={cn(
+                                      "w-full flex items-center justify-between p-2 rounded-md text-left transition-colors",
+                                      "hover:bg-accent/50 focus:outline-none focus:bg-accent/50",
+                                      currentModelId === model.id && "text-primary font-medium"
+                                    )}
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      handleModelChange(model.id);
+                                    }}
+                                  >
+                                    <div className="flex flex-col">
+                                      <span className="font-medium text-sm">{model.name}</span>
+                                      <span className="text-xs text-muted-foreground">{model.provider}</span>
+                                    </div>
+                                    <div className="flex items-center gap-1">
+                                      <span className="text-xs text-orange-500 font-semibold">
+                                        {model.creditsPerUse} 积分
+                                      </span>
+                                    </div>
+                                  </button>
+                                </MotionHighlightItem>
+                              ))}
                             </div>
-                            <div className="flex items-center gap-1">
-                              <span className="text-xs text-orange-500 font-semibold">
-                                {model.creditsPerUse} 积分
-                              </span>
-                            </div>
-                          </DropdownMenuItem>
-                        ))}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                          </MotionHighlight>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </div>
                 </div>
 
-                {/* 右侧信息区域（可以放置其他信息） */}
+                {/* 右侧信息区域 */}
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
                   {selectedImages.length > 0 && (
                     <span>{selectedImages.length}/{maxImages} 图片</span>
