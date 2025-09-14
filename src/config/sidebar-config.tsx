@@ -8,6 +8,7 @@ import {
   CircleUserRoundIcon,
   CoinsIcon,
   CreditCardIcon,
+  ImageIcon,
   LayoutDashboardIcon,
   LockKeyholeIcon,
   Settings2Icon,
@@ -38,6 +39,12 @@ export function getSidebarLinks(): NestedMenuItem[] {
       title: t('dashboard.title'),
       icon: <LayoutDashboardIcon className="size-4 shrink-0" />,
       href: Routes.Dashboard,
+      external: false,
+    },
+    {
+      title: t('aiPhotoEditor.title'),
+      icon: <ImageIcon className="size-4 shrink-0" />,
+      href: Routes.AIPhotoEditor,
       external: false,
     },
     {

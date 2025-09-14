@@ -478,6 +478,10 @@
     "dashboard": {
       "title": "Dashboard"
     },
+    "aiPhotoEditor": {
+      "title": "AI Photo Editor",
+      "description": "Generate and edit images with AI"
+    },
     "admin": {
       "title": "Admin",
       "users": {

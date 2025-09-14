@@ -478,6 +478,10 @@
     "dashboard": {
       "title": "仪表盘"
     },
+    "aiPhotoEditor": {
+      "title": "AI图片编辑",
+      "description": "使用AI生成和编辑图片"
+    },
     "admin": {
       "title": "系统管理",
       "users": {

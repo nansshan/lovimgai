@@ -43,6 +43,7 @@ export enum Routes {
   AIChat = '/ai/chat',
   AIVideo = '/ai/video',
   AIAudio = '/ai/audio',
+  AIPhotoEditor = '/ai-photo-editor',
 
   // block routes
   MagicuiBlocks = '/magicui',
@@ -81,6 +82,7 @@ export const protectedRoutes = [
   Routes.SettingsCredits,
   Routes.SettingsSecurity,
   Routes.SettingsNotifications,
+  Routes.AIPhotoEditor,
 ];
 
 /**
