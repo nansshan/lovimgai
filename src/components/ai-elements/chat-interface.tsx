@@ -202,131 +202,146 @@ export function ChatInterface({
 
           {/* 输入框容器 */}
           <div className="relative">
-            <div className="flex items-end gap-2 p-3 border rounded-lg bg-background focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary transition-all">
-              {/* 图片上传按钮 */}
-              <div className="relative group flex-shrink-0">
-                <input
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  onChange={handleImageSelect}
-                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
-                  disabled={disabled || selectedImages.length >= maxImages}
-                />
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  disabled={disabled || selectedImages.length >= maxImages}
-                  className={cn(
-                    "size-8 p-0 transition-all duration-200",
-                    "hover:bg-muted/50 hover:scale-105",
-                    "disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100",
-                    selectedImages.length >= maxImages && "opacity-40"
+            <div className="flex flex-col gap-3 p-4 border rounded-xl bg-background focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary transition-all">
+              {/* 输入框区域 */}
+              <div className="flex items-start gap-3">
+                {/* 输入框 */}
+                <div className="flex-1 min-w-0">
+                  <Textarea
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder={placeholder}
+                    disabled={disabled}
+                    className={cn(
+                      "min-h-[80px] max-h-[200px] resize-none border-none p-0 shadow-none focus-visible:ring-0",
+                      "placeholder:text-muted-foreground/70 bg-transparent leading-relaxed",
+                      disabled && "opacity-50 cursor-not-allowed"
+                    )}
+                    rows={3}
+                  />
+                </div>
+
+                {/* 发送/停止按钮 */}
+                <div className="flex-shrink-0 mt-1">
+                  {isGenerating ? (
+                    <Button
+                      onClick={onStopGeneration}
+                      variant="destructive"
+                      size="sm"
+                      className={cn(
+                        "size-8 p-0 transition-all duration-200",
+                        "hover:scale-105 active:scale-95",
+                        "animate-pulse"
+                      )}
+                      title="停止生成"
+                    >
+                      <StopCircleIcon className="size-4" />
+                    </Button>
+                  ) : (
+                    <Button
+                      onClick={handleSend}
+                      disabled={disabled || (!input.trim() && selectedImages.length === 0)}
+                      size="sm"
+                      className={cn(
+                        "size-8 p-0 transition-all duration-200",
+                        "hover:scale-105 active:scale-95",
+                        "disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100",
+                        (!input.trim() && selectedImages.length === 0) ?
+                          "bg-muted text-muted-foreground hover:bg-muted" :
+                          "bg-primary text-primary-foreground hover:bg-primary/90"
+                      )}
+                      title={(!input.trim() && selectedImages.length === 0) ? "请输入内容或选择图片" : "发送消息"}
+                    >
+                      <SendIcon className="size-4" />
+                    </Button>
                   )}
-                  title={selectedImages.length >= maxImages ? `最多选择${maxImages}张图片` : "上传图片"}
-                >
-                  <ImageIcon className="size-4 text-muted-foreground" />
-                </Button>
+                </div>
               </div>
 
-              {/* 模型选择器 */}
-              <div className="flex-shrink-0">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
+              {/* 底部工具栏 */}
+              <div className="flex items-center justify-between pt-2 border-t border-border/50">
+                <div className="flex items-center gap-2">
+                  {/* 图片上传按钮 */}
+                  <div className="relative group">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      onChange={handleImageSelect}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
+                      disabled={disabled || selectedImages.length >= maxImages}
+                    />
                     <Button
                       variant="ghost"
                       size="sm"
-                      disabled={disabled}
+                      disabled={disabled || selectedImages.length >= maxImages}
                       className={cn(
-                        "h-8 px-2 gap-1 transition-all duration-200",
+                        "size-8 p-0 transition-all duration-200",
                         "hover:bg-muted/50 hover:scale-105",
                         "disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100",
-                        "text-xs font-medium"
+                        selectedImages.length >= maxImages && "opacity-40"
                       )}
-                      title="选择AI模型"
+                      title={selectedImages.length >= maxImages ? `最多选择${maxImages}张图片` : "上传图片"}
                     >
-                      <BrainCircuitIcon className="size-3 text-muted-foreground" />
-                      <span className="text-muted-foreground">{currentModel.name}</span>
-                      <span className="text-xs text-orange-500 font-semibold">{currentModel.creditsPerUse}</span>
-                      <ChevronDownIcon className="size-3 text-muted-foreground" />
+                      <ImageIcon className="size-4 text-muted-foreground" />
                     </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start" className="w-56">
-                    {AVAILABLE_MODELS.map((model) => (
-                      <DropdownMenuItem
-                        key={model.id}
-                        onClick={() => handleModelChange(model.id)}
-                        className={cn(
-                          "flex items-center justify-between cursor-pointer",
-                          currentModelId === model.id && "bg-accent"
-                        )}
-                      >
-                        <div className="flex flex-col">
-                          <span className="font-medium">{model.name}</span>
-                          <span className="text-xs text-muted-foreground">{model.provider}</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <span className="text-xs text-orange-500 font-semibold">
-                            {model.creditsPerUse} 积分
-                          </span>
-                        </div>
-                      </DropdownMenuItem>
-                    ))}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
+                  </div>
 
-              {/* 输入框 */}
-              <div className="flex-1 min-w-0">
-                <Textarea
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  placeholder={placeholder}
-                  disabled={disabled}
-                  className={cn(
-                    "min-h-[40px] max-h-[120px] resize-none border-none p-0 shadow-none focus-visible:ring-0",
-                    "placeholder:text-muted-foreground/70 bg-transparent",
-                    disabled && "opacity-50 cursor-not-allowed"
+                  {/* 模型选择器 */}
+                  <div className="flex-shrink-0">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          disabled={disabled}
+                          className={cn(
+                            "h-8 px-2 gap-1 transition-all duration-200",
+                            "hover:bg-muted/50 hover:scale-105",
+                            "disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100",
+                            "text-xs font-medium"
+                          )}
+                          title="选择AI模型"
+                        >
+                          <BrainCircuitIcon className="size-3 text-muted-foreground" />
+                          <span className="text-muted-foreground">{currentModel.name}</span>
+                          <span className="text-xs text-orange-500 font-semibold">{currentModel.creditsPerUse}</span>
+                          <ChevronDownIcon className="size-3 text-muted-foreground" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="start" className="w-56">
+                        {AVAILABLE_MODELS.map((model) => (
+                          <DropdownMenuItem
+                            key={model.id}
+                            onClick={() => handleModelChange(model.id)}
+                            className={cn(
+                              "flex items-center justify-between cursor-pointer",
+                              currentModelId === model.id && "bg-accent"
+                            )}
+                          >
+                            <div className="flex flex-col">
+                              <span className="font-medium">{model.name}</span>
+                              <span className="text-xs text-muted-foreground">{model.provider}</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <span className="text-xs text-orange-500 font-semibold">
+                                {model.creditsPerUse} 积分
+                              </span>
+                            </div>
+                          </DropdownMenuItem>
+                        ))}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </div>
+
+                {/* 右侧信息区域（可以放置其他信息） */}
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  {selectedImages.length > 0 && (
+                    <span>{selectedImages.length}/{maxImages} 图片</span>
                   )}
-                  rows={1}
-                />
-              </div>
-
-              {/* 发送/停止按钮 */}
-              <div className="flex-shrink-0">
-                {isGenerating ? (
-                  <Button
-                    onClick={onStopGeneration}
-                    variant="destructive"
-                    size="sm"
-                    className={cn(
-                      "size-8 p-0 transition-all duration-200",
-                      "hover:scale-105 active:scale-95",
-                      "animate-pulse"
-                    )}
-                    title="停止生成"
-                  >
-                    <StopCircleIcon className="size-4" />
-                  </Button>
-                ) : (
-                  <Button
-                    onClick={handleSend}
-                    disabled={disabled || (!input.trim() && selectedImages.length === 0)}
-                    size="sm"
-                    className={cn(
-                      "size-8 p-0 transition-all duration-200",
-                      "hover:scale-105 active:scale-95",
-                      "disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100",
-                      (!input.trim() && selectedImages.length === 0) ?
-                        "bg-muted text-muted-foreground hover:bg-muted" :
-                        "bg-primary text-primary-foreground hover:bg-primary/90"
-                    )}
-                    title={(!input.trim() && selectedImages.length === 0) ? "请输入内容或选择图片" : "发送消息"}
-                  >
-                    <SendIcon className="size-4" />
-                  </Button>
-                )}
+                </div>
               </div>
             </div>
           </div>
