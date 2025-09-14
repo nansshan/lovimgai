@@ -13,7 +13,8 @@ import { Routes } from '@/routes';
 import { useAIEditorStore } from '@/stores/ai-editor-store';
 import { PlusIcon } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { useState } from 'react';
+import { useEffect } from 'react';
+import { toast } from 'sonner';
 
 /**
  * AI编辑器侧边栏内容组件
@@ -27,47 +28,47 @@ import { useState } from 'react';
 export function AIEditorSidebarSection() {
   const pathname = useLocalePathname();
   const t = useTranslations('Dashboard.aiPhotoEditor');
-  const [isCreatingSession, setIsCreatingSession] = useState(false);
 
   // 路径检测：仅在AI编辑器页面显示
   const isAIEditorPage = pathname === Routes.AIPhotoEditor;
 
-  // 连接AIEditorStore状态
+  // 连接AIEditorStore状态和方法
   const {
     sessions,
     currentSessionId,
     currentMode,
+    isLoadingSessions,
+    isCreatingSession,
+    hasInitializedSessions,
     setCurrentSession,
-    addSession,
     setMode,
+    initializeSessions,
+    createNewSession,
   } = useAIEditorStore();
+
+  // 获取用户的会话数据 - 只在首次进入页面时调用
+  useEffect(() => {
+    if (!isAIEditorPage) return;
+
+    // 只有在未初始化且不在加载中时才初始化
+    if (!hasInitializedSessions && !isLoadingSessions) {
+      initializeSessions();
+    }
+  }, [
+    isAIEditorPage,
+    hasInitializedSessions,
+    isLoadingSessions,
+    initializeSessions,
+  ]);
 
   // 如果不在AI编辑器页面，不渲染任何内容
   if (!isAIEditorPage) return null;
 
   // 新建会话处理
   const handleNewSession = async () => {
-    try {
-      setIsCreatingSession(true);
-
-      // 创建新会话
-      const newSession = {
-        id: `session-${Date.now()}`,
-        title: '新建对话',
-        firstPrompt: null,
-        taskCount: 0,
-        lastActivity: new Date().toISOString(),
-        createdAt: new Date().toISOString(),
-      };
-
-      // 添加到store
-      addSession(newSession);
-
-      console.log('新建会话:', newSession.id);
-    } catch (error) {
-      console.error('创建会话失败:', error);
-    } finally {
-      setIsCreatingSession(false);
+    const sessionId = await createNewSession();
+    if (!sessionId) {
+      toast.error('创建会话失败，请稍后重试');
     }
   };
 
@@ -119,6 +120,7 @@ export function AIEditorSidebarSection() {
             currentSessionId={currentSessionId}
             onSessionSelect={handleSessionChange}
             className="h-full"
+            isLoading={isLoadingSessions}
           />
         </div>
       </SidebarGroupContent>
@@ -133,42 +135,41 @@ export function AIEditorSidebarSection() {
  */
 export function CompactAIEditorSidebarSection() {
   const pathname = useLocalePathname();
-  const [isCreatingSession, setIsCreatingSession] = useState(false);
 
   // 路径检测
   const isAIEditorPage = pathname === Routes.AIPhotoEditor;
 
-  // 连接状态
+  // 连接状态和方法
   const {
     sessions,
-    currentSessionId,
-    currentMode,
-    setCurrentSession,
-    addSession,
-    setMode,
+    isLoadingSessions,
+    isCreatingSession,
+    hasInitializedSessions,
+    initializeSessions,
+    createNewSession,
   } = useAIEditorStore();
+
+  // 获取用户的会话数据 - 只在首次进入页面时调用
+  useEffect(() => {
+    if (!isAIEditorPage) return;
+
+    if (!hasInitializedSessions && !isLoadingSessions) {
+      initializeSessions();
+    }
+  }, [
+    isAIEditorPage,
+    hasInitializedSessions,
+    isLoadingSessions,
+    initializeSessions,
+  ]);
 
   if (!isAIEditorPage) return null;
 
   // 新建会话处理（简化版）
   const handleNewSession = async () => {
-    try {
-      setIsCreatingSession(true);
-
-      const newSession = {
-        id: `session-${Date.now()}`,
-        title: '新建对话',
-        firstPrompt: null,
-        taskCount: 0,
-        lastActivity: new Date().toISOString(),
-        createdAt: new Date().toISOString(),
-      };
-
-      addSession(newSession);
-    } catch (error) {
-      console.error('创建会话失败:', error);
-    } finally {
-      setIsCreatingSession(false);
+    const sessionId = await createNewSession();
+    if (!sessionId) {
+      toast.error('创建会话失败，请稍后重试');
     }
   };
 
@@ -187,7 +188,7 @@ export function CompactAIEditorSidebarSection() {
 
         {/* 会话数量指示 */}
         <div className="text-xs text-center text-muted-foreground">
-          {sessions.length}
+          {isLoadingSessions ? '...' : sessions.length}
         </div>
       </SidebarGroupContent>
     </SidebarGroup>

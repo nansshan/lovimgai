@@ -6,7 +6,14 @@ import { desc, eq } from 'drizzle-orm';
 import { type NextRequest, NextResponse } from 'next/server';
 
 /**
- * 创建新的AI图片编辑会话
+ * 创建新的AI图片编辑会话（智能创建逻辑）
+ *
+ * 逻辑：
+ * 1. 查询用户的会话列表
+ * 2. 如果列表为空，创建新会话
+ * 3. 如果列表不为空，检查最新会话的taskCount
+ *    - 如果taskCount为0，返回该会话（避免创建空会话）
+ *    - 如果taskCount不为0，创建新会话
  */
 export async function POST(request: NextRequest) {
   try {
@@ -20,11 +27,36 @@ export async function POST(request: NextRequest) {
     }
 
     const userId = session.user.id;
+    const db = await getDb();
+
+    // 1. 查询用户的会话列表（按最后活动时间倒序，获取最新的一条）
+    const existingSessions = await db
+      .select({
+        id: aiPhotoSession.id,
+        taskCount: aiPhotoSession.taskCount,
+        lastActivity: aiPhotoSession.lastActivity,
+      })
+      .from(aiPhotoSession)
+      .where(eq(aiPhotoSession.userId, userId))
+      .orderBy(desc(aiPhotoSession.lastActivity))
+      .limit(1);
+
+    // 2. 如果有会话且最新会话的任务数为0，则返回该会话
+    if (existingSessions.length > 0 && existingSessions[0].taskCount === 0) {
+      const existingSession = existingSessions[0];
+      console.log(`返回现有空会话: ${existingSession.id}`);
+
+      return NextResponse.json({
+        success: true,
+        sessionId: existingSession.id,
+        isNewSession: false, // 标记这是复用的会话
+      });
+    }
+
+    // 3. 创建新会话（列表为空 或 最新会话已有任务）
     const sessionId = randomUUID();
     const now = new Date();
 
-    // 创建新会话
-    const db = await getDb();
     await db.insert(aiPhotoSession).values({
       id: sessionId,
       userId: userId,
@@ -36,9 +68,12 @@ export async function POST(request: NextRequest) {
       updatedAt: now,
     });
 
+    console.log(`创建新会话: ${sessionId}`);
+
     return NextResponse.json({
       success: true,
       sessionId: sessionId,
+      isNewSession: true, // 标记这是新创建的会话
     });
   } catch (error) {
     console.error('Create session error:', error);

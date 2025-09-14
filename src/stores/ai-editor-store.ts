@@ -1,3 +1,4 @@
+import { getAIPhotoSessionsAction } from '@/actions/get-ai-photo-sessions';
 import type { ChatMessage } from '@/components/ai-elements/chat-interface';
 import type { ImageItem } from '@/components/ai-elements/image-preview-panel';
 import type { EditorMode } from '@/components/ai-elements/mode-toggle';
@@ -25,6 +26,13 @@ interface AIEditorState {
 
   // UI状态
   isGenerating: boolean;
+
+  // Loading状态
+  isLoadingSessions: boolean;
+  isCreatingSession: boolean;
+
+  // 初始化标记
+  hasInitializedSessions: boolean;
 }
 
 /**
@@ -33,9 +41,18 @@ interface AIEditorState {
 interface AIEditorActions {
   // 会话管理
   setCurrentSession: (id: string) => void;
+  setCurrentSessionId: (id: string) => void; // 添加简单的ID设置方法
   addSession: (session: EditSession) => void;
   updateSession: (id: string, updates: Partial<EditSession>) => void;
   removeSession: (id: string) => void;
+  setSessions: (sessions: EditSession[]) => void; // 新增方法
+
+  // 异步会话操作
+  loadSessions: (limit?: number) => Promise<boolean>;
+  createNewSession: () => Promise<string | null>;
+
+  // 初始化方法
+  initializeSessions: (limit?: number) => Promise<boolean>;
 
   // 模式切换
   setMode: (mode: EditorMode) => void;
@@ -60,49 +77,19 @@ interface AIEditorActions {
 }
 
 /**
- * 初始状态（包含演示数据）
+ * 初始状态（清空演示数据，改为空状态）
  */
 const initialState: AIEditorState = {
-  sessions: [
-    {
-      id: 'demo-session-1',
-      title: '科幻城市景观',
-      firstPrompt: '生成一个未来科幻城市的景观图片',
-      taskCount: 3,
-      lastActivity: new Date(Date.now() - 1000 * 60 * 30).toISOString(), // 30分钟前
-      createdAt: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(), // 2小时前
-    },
-    {
-      id: 'demo-session-2',
-      title: '可爱的小猫',
-      firstPrompt: '画一只可爱的橘色小猫在阳光下睡觉',
-      taskCount: 1,
-      lastActivity: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(), // 1天前
-      createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
-    },
-  ],
-  currentSessionId: 'demo-session-1',
+  sessions: [], // 移除硬编码的演示数据
+  currentSessionId: undefined, // 初始没有选中的会话
   currentMode: 'chat',
-  messages: [
-    {
-      id: 'demo-msg-1',
-      type: 'user',
-      content: '生成一个未来科幻城市的景观图片',
-      timestamp: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
-      status: 'completed',
-    },
-    {
-      id: 'demo-msg-2',
-      type: 'assistant',
-      content:
-        '我为您生成了一个未来科幻城市的景观图片。这个城市有着高耸的摩天大楼、飞行汽车和霓虹灯装饰。',
-      timestamp: new Date(Date.now() - 1000 * 60 * 29).toISOString(),
-      status: 'completed',
-    },
-  ],
+  messages: [],
   images: [],
   selectedImageId: undefined,
   isGenerating: false,
+  isLoadingSessions: false,
+  isCreatingSession: false,
+  hasInitializedSessions: false,
 };
 
 /**
@@ -114,6 +101,7 @@ const initialState: AIEditorState = {
  * - 对话数据（messages）
  * - 图片数据（images, selectedImageId）
  * - UI状态（isGenerating）
+ * - 异步数据获取（loadSessions, createNewSession）
  *
  * 支持状态持久化，会话数据会自动保存到localStorage
  */
@@ -122,6 +110,90 @@ export const useAIEditorStore = create<AIEditorState & AIEditorActions>()(
     (set, get) => ({
       // 初始状态
       ...initialState,
+
+      // 异步会话操作
+      loadSessions: async (limit = 50): Promise<boolean> => {
+        try {
+          const result = await getAIPhotoSessionsAction({ limit });
+
+          if (result?.data?.success && result.data.data) {
+            // 转换数据格式以匹配EditSession类型
+            const sessions: EditSession[] = result.data.data.map((session) => ({
+              id: session.id,
+              title: session.title,
+              firstPrompt: session.firstPrompt,
+              taskCount: session.taskCount,
+              lastActivity: session.lastActivity,
+              createdAt: session.createdAt,
+            }));
+
+            set({ sessions });
+            return true;
+          }
+
+          console.error('获取会话列表失败:', result?.data?.error);
+          return false;
+        } catch (error) {
+          console.error('加载会话列表失败:', error);
+          return false;
+        }
+      },
+
+      createNewSession: async (): Promise<string | null> => {
+        try {
+          set({ isCreatingSession: true });
+
+          // 调用新建会话API
+          const response = await fetch('/api/ai-photo-editor/sessions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          });
+
+          const data = await response.json();
+
+          if (!response.ok || !data.success) {
+            throw new Error(data.error || `API请求失败: ${response.status}`);
+          }
+
+          // 创建成功后重新加载会话列表
+          const loadSuccess = await get().loadSessions();
+          if (loadSuccess) {
+            // 设置新创建的会话为当前会话
+            get().setCurrentSession(data.sessionId);
+            return data.sessionId;
+          }
+
+          return null;
+        } catch (error) {
+          console.error('创建会话失败:', error);
+          return null;
+        } finally {
+          set({ isCreatingSession: false });
+        }
+      },
+
+      // 初始化方法
+      initializeSessions: async (limit = 50): Promise<boolean> => {
+        try {
+          set({ hasInitializedSessions: false }); // 确保标记为false
+          set({ isLoadingSessions: true });
+
+          const result = await get().loadSessions(limit);
+
+          if (result) {
+            set({ hasInitializedSessions: true });
+            return true;
+          }
+          return false;
+        } catch (error) {
+          console.error('初始化会话失败:', error);
+          return false;
+        } finally {
+          set({ isLoadingSessions: false });
+        }
+      },
 
       // 会话管理 Actions
       setCurrentSession: (id: string) => {
@@ -136,6 +208,10 @@ export const useAIEditorStore = create<AIEditorState & AIEditorActions>()(
             selectedImageId: undefined,
           });
         }
+      },
+
+      setCurrentSessionId: (id: string) => {
+        set({ currentSessionId: id });
       },
 
       addSession: (session: EditSession) => {
@@ -180,6 +256,10 @@ export const useAIEditorStore = create<AIEditorState & AIEditorActions>()(
               : {}),
           };
         });
+      },
+
+      setSessions: (sessions: EditSession[]) => {
+        set({ sessions });
       },
 
       // 模式切换 Actions
@@ -258,7 +338,7 @@ export const useAIEditorStore = create<AIEditorState & AIEditorActions>()(
       },
 
       resetStore: () => {
-        set(initialState);
+        set({ ...initialState, hasInitializedSessions: false });
       },
     }),
     {
