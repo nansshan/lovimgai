@@ -1,4 +1,4 @@
-import { boolean, integer, pgTable, text, timestamp, index } from "drizzle-orm/pg-core";
+import { boolean, integer, pgTable, text, timestamp, index, json } from "drizzle-orm/pg-core";
 
 export const user = pgTable("user", {
 	id: text("id").primaryKey(),
@@ -116,4 +116,42 @@ export const creditTransaction = pgTable("credit_transaction", {
 }, (table) => ({
 	creditTransactionUserIdIdx: index("credit_transaction_user_id_idx").on(table.userId),
 	creditTransactionTypeIdx: index("credit_transaction_type_idx").on(table.type),
+}));
+
+// AI Photo Editor Tables
+export const aiPhotoSession = pgTable("ai_photo_session", {
+	id: text("id").primaryKey(),
+	userId: text("user_id").notNull().references(() => user.id, { onDelete: 'cascade' }),
+	title: text("title").notNull(),
+	firstPrompt: text("first_prompt"),
+	taskCount: integer("task_count").notNull().default(0),
+	lastActivity: timestamp("last_activity").notNull(),
+	createdAt: timestamp("created_at").notNull().defaultNow(),
+	updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+	aiPhotoSessionUserActivityIdx: index("ai_photo_session_user_activity_idx").on(table.userId, table.lastActivity),
+	aiPhotoSessionUserCreatedIdx: index("ai_photo_session_user_created_idx").on(table.userId, table.createdAt),
+}));
+
+export const aiPhotoTask = pgTable("ai_photo_task", {
+	id: text("id").primaryKey(),
+	userId: text("user_id").notNull().references(() => user.id, { onDelete: 'cascade' }),
+	sessionId: text("session_id").notNull().references(() => aiPhotoSession.id, { onDelete: 'cascade' }),
+	prompt: text("prompt").notNull(),
+	inputImages: json("input_images"), // string[] - 用户上传的参考图片链接数组
+	outputImageUrl: text("output_image_url"),
+	status: text("status").notNull(), // 'pending' | 'processing' | 'completed' | 'failed'
+	taskId: text("task_id"), // 第三方AI接口返回的任务ID
+	providerModel: text("provider_model"),
+	creditsCost: integer("credits_cost").notNull(),
+	errorMessage: text("error_message"),
+	sequenceOrder: integer("sequence_order").notNull(),
+	createdAt: timestamp("created_at").notNull().defaultNow(),
+	updatedAt: timestamp("updated_at").notNull().defaultNow(),
+	completedAt: timestamp("completed_at"),
+}, (table) => ({
+	aiPhotoTaskSessionOrderIdx: index("ai_photo_task_session_order_idx").on(table.sessionId, table.sequenceOrder),
+	aiPhotoTaskTaskIdIdx: index("ai_photo_task_task_id_idx").on(table.taskId),
+	aiPhotoTaskUserCreatedIdx: index("ai_photo_task_user_created_idx").on(table.userId, table.createdAt),
+	aiPhotoTaskStatusIdx: index("ai_photo_task_status_idx").on(table.status),
 }));

@@ -16,6 +16,7 @@ export const PROVIDERS: Record<
     iconPath: '/provider-icons/replicate.svg',
     color: 'from-purple-500 to-blue-500',
     models: [
+      'google/nano-banana', // AI图片编辑器专用模型
       'black-forest-labs/flux-1.1-pro',
       'black-forest-labs/flux-1.1-pro-ultra',
       'black-forest-labs/flux-dev',
