@@ -25,6 +25,14 @@ export const AVAILABLE_MODELS: AIModel[] = [
     maxImages: 1,
     description: 'Google的高效图片生成模型，专为对话式编辑优化',
   },
+  {
+    id: 'bytedance/seedream-4',
+    name: 'SeeDream 4',
+    provider: 'ByteDance',
+    creditsPerUse: 12,
+    maxImages: 1,
+    description: '字节跳动的先进图片生成模型，支持高质量图像创作',
+  },
   // 未来可以添加更多模型
 ];
 

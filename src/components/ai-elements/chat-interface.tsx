@@ -3,13 +3,20 @@
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Textarea } from '@/components/ui/textarea';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger
+} from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
-import { ImageIcon, SendIcon, StopCircleIcon } from 'lucide-react';
+import { ImageIcon, SendIcon, StopCircleIcon, ChevronDownIcon, BrainCircuitIcon } from 'lucide-react';
 import { useLocale } from 'next-intl';
-import { useState, type KeyboardEvent } from 'react';
+import { useState, useEffect, type KeyboardEvent } from 'react';
 import { toast } from 'sonner';
+import { AVAILABLE_MODELS, DEFAULT_MODEL_ID, type AIModel } from '@/config/ai-models-config';
 
 export interface ChatMessage {
   id: string;
@@ -23,13 +30,15 @@ export interface ChatMessage {
 
 interface ChatInterfaceProps {
   messages: ChatMessage[];
-  onSendMessage: (content: string, images?: File[]) => void;
+  onSendMessage: (content: string, images?: File[], modelId?: string) => void;
   onStopGeneration?: () => void;
   isGenerating?: boolean;
   placeholder?: string;
   maxImages?: number;
   disabled?: boolean;
   className?: string;
+  selectedModelId?: string;
+  onModelChange?: (modelId: string) => void;
 }
 
 /**
@@ -40,6 +49,7 @@ interface ChatInterfaceProps {
  * - 支持文本和图片输入
  * - 显示生成状态和进度
  * - 支持停止生成
+ * - 模型选择功能
  */
 export function ChatInterface({
   messages,
@@ -50,16 +60,26 @@ export function ChatInterface({
   maxImages = 5,
   disabled = false,
   className,
+  selectedModelId = DEFAULT_MODEL_ID,
+  onModelChange,
 }: ChatInterfaceProps) {
   const [input, setInput] = useState('');
   const [selectedImages, setSelectedImages] = useState<File[]>([]);
+  const [currentModelId, setCurrentModelId] = useState(selectedModelId);
   const locale = useLocale();
+
+  // 同步外部传入的模型ID
+  useEffect(() => {
+    setCurrentModelId(selectedModelId);
+  }, [selectedModelId]);
+
+  const currentModel = AVAILABLE_MODELS.find(model => model.id === currentModelId) || AVAILABLE_MODELS[0];
 
   const handleSend = () => {
     if (!input.trim() && selectedImages.length === 0) return;
     if (disabled || isGenerating) return;
 
-    onSendMessage(input.trim(), selectedImages.length > 0 ? selectedImages : undefined);
+    onSendMessage(input.trim(), selectedImages.length > 0 ? selectedImages : undefined, currentModelId);
     setInput('');
     setSelectedImages([]);
   };
@@ -113,6 +133,12 @@ export function ChatInterface({
 
   const removeImage = (index: number) => {
     setSelectedImages(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleModelChange = (modelId: string) => {
+    setCurrentModelId(modelId);
+    onModelChange?.(modelId);
+    toast.success(`已切换到 ${AVAILABLE_MODELS.find(m => m.id === modelId)?.name} 模型`);
   };
 
   return (
@@ -201,6 +227,53 @@ export function ChatInterface({
                 >
                   <ImageIcon className="size-4 text-muted-foreground" />
                 </Button>
+              </div>
+
+              {/* 模型选择器 */}
+              <div className="flex-shrink-0">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={disabled}
+                      className={cn(
+                        "h-8 px-2 gap-1 transition-all duration-200",
+                        "hover:bg-muted/50 hover:scale-105",
+                        "disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100",
+                        "text-xs font-medium"
+                      )}
+                      title="选择AI模型"
+                    >
+                      <BrainCircuitIcon className="size-3 text-muted-foreground" />
+                      <span className="text-muted-foreground">{currentModel.name}</span>
+                      <span className="text-xs text-orange-500 font-semibold">{currentModel.creditsPerUse}</span>
+                      <ChevronDownIcon className="size-3 text-muted-foreground" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="w-56">
+                    {AVAILABLE_MODELS.map((model) => (
+                      <DropdownMenuItem
+                        key={model.id}
+                        onClick={() => handleModelChange(model.id)}
+                        className={cn(
+                          "flex items-center justify-between cursor-pointer",
+                          currentModelId === model.id && "bg-accent"
+                        )}
+                      >
+                        <div className="flex flex-col">
+                          <span className="font-medium">{model.name}</span>
+                          <span className="text-xs text-muted-foreground">{model.provider}</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <span className="text-xs text-orange-500 font-semibold">
+                            {model.creditsPerUse} 积分
+                          </span>
+                        </div>
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
 
               {/* 输入框 */}
